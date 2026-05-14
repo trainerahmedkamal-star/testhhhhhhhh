@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تجربة نطق AI محلي</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #f0f2f5; }
+        .card { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 80%; max-width: 400px; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        button:disabled { background: #ccc; }
+        #status { margin-top: 15px; font-size: 14px; color: #555; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>AI TTS Local Test</h2>
+    <p>تجربة نطق بشري عالي الجودة (Piper/VITS)</p>
+    <textarea id="textInput" rows="3" style="width: 100%;" placeholder="اكتب نصاً بالإنجليزية هنا...">Hello! This is a high-quality AI voice running directly in your browser.</textarea>
+    <br>
+    <button id="speakBtn">تشغيل النطق</button>
+    <div id="status">جاري تجهيز المحرك (أول مرة فقط)...</div>
+</div>
+
+<script type="module">
+    // استدعاء المكتبة من سيرفر خارجي (CDN) لتعمل الصفحة فوراً
+    import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.1';
+
+    let synthesizer;
+    const btn = document.getElementById('speakBtn');
+    const status = document.getElementById('status');
+
+    // تجهيز المحرك عند تحميل الصفحة
+    async function init() {
+        try {
+            // تحميل موديل صغير وسريع جداً (حوالي 20 ميجا)
+            synthesizer = await pipeline('text-to-speech', 'Xenova/distil-whisper'); 
+            status.innerText = "المحرك جاهز! اضغط على الزر.";
+            btn.disabled = false;
+        } catch (e) {
+            status.innerText = "خطأ في تحميل الموديل: " + e.message;
+        }
+    }
+
+    async function speak() {
+        const text = document.getElementById('textInput').value;
+        if (!text) return;
+
+        status.innerText = "جاري توليد الصوت...";
+        btn.disabled = true;
+
+        try {
+            // توليد الصوت محلياً 100%
+            const output = await synthesizer(text);
+            
+            // تشغيل الصوت الناتج
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const buffer = audioContext.createBuffer(1, output.audio.length, output.sampling_rate);
+            buffer.getChannelData(0).set(output.audio);
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+            source.start();
+            
+            status.innerText = "تم النطق بنجاح!";
+        } catch (e) {
+            status.innerText = "خطأ أثناء النطق.";
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    btn.addEventListener('click', speak);
+    btn.disabled = true;
+    init();
+</script>
+
+</body>
+</html>
